@@ -1,0 +1,43 @@
+FROM python:3.12.3
+
+# PYTHONDONTWRITEBYTECODE: Prevents Python from writing .pyc files
+# PYTHONUNBUFFERED: Forces stdout and stderr to be unbuffered
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+ARG POETRY_VERSION=1.8.3
+RUN pip install "poetry==${POETRY_VERSION}"
+
+# Copy poetry files and install dependencies
+COPY pyproject.toml poetry.lock ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi
+
+# Copy full project source
+COPY . /app/
+
+# Copy dev env file
+RUN cp /app/.env.dev /app/.env
+
+# Make scripts executable
+RUN chmod +x /app/scripts/entrypoint.sh /app/scripts/wait-for-db.sh
+
+# Create a non-root user and set permissions
+RUN adduser --disabled-password --gecos '' appuser && \
+    mkdir -p /app/celery && \
+    chown -R appuser:appuser /app && \
+    chmod -R u+rw /app/celery
+
+# Switch to non-root user
+USER appuser
+
+EXPOSE 5000

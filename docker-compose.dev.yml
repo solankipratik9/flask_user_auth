@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      - CONFIG_NAME=${CONFIG_NAME}
+      - DATABASE_URL=${DATABASE_URL}
+    entrypoint: /app/scripts/entrypoint.sh
+    image: flask-backend-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "5000:5000"
+
+  celery:
+    image: flask-backend-dev
+    environment:
+      - CONFIG_NAME=${CONFIG_NAME}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      celery -A app.celery_app.celery worker --loglevel=debug
+
+  celery-beat:
+    image: flask-backend-dev
+    working_dir: /app
+    environment:
+      - CONFIG_NAME=${CONFIG_NAME}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      celery -A app.celery_app.celery beat
+      --loglevel=info
+      --schedule /app/celery/celerybeat-schedule.db
+    volumes:
+      - celery_beat_schedule:/app/celery
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.dev
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  celery_beat_schedule:

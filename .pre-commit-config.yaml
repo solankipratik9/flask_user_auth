@@ -1,0 +1,88 @@
+# /repo/.pre-commit-config.yaml
+#
+# This file configures pre-commit hooks for your repo.
+# Hooks will apply to relevant files across all services (api, web, other_api_service, etc.).
+#
+# --- IMPORTANT PREREQUISITES ---
+# For *each* Python sub-project (e.g., api/, web/, other_api_service/):
+# 1. Ensure 'ruff' is in its `pyproject.toml`'s dev dependencies:
+#    e.g., inside 'api/' directory, run `poetry add --group dev ruff`
+# 2. Ensure 'djlint' is in its `pyproject.toml`'s dev dependencies (if it uses Django templates):
+#    e.g., inside 'api/' directory, run `poetry add --group dev djlint`
+# 3. Configure 'ruff' and 'djlint' within each sub-project's respective `pyproject.toml`.
+#
+# --- INSTALLATION (Run from monorepo_root) ---
+# Install `pre-commit` (compatible with version "^4.2.0")
+# e.g., poetry add --group dev pre-commit
+# Run: poetry run pre-commit install
+#
+# --- RUNNING MANUALLY (Run from repo root) ---
+# poetry run pre-commit run --all-files
+
+repos:
+  # --- Standard Pre-Commit Hooks ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: debug-statements
+
+  # --- Python Linter & Formatter (Ruff) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.12
+    hooks:
+      - id: ruff
+        files: '^api/.*\.py$'
+        args:
+          - --fix
+          - --exit-non-zero-on-fix
+      - id: ruff-format
+        files: '^api/.*\.py$'
+
+  # --- Django/Jinja Template Formatter (if applicable) ---
+  - repo: https://github.com/djlint/djlint
+    rev: v1.36.4
+    hooks:
+      - id: djlint
+        name: djlint (format)
+        files: '^(api|web)/.*\.(html|txt|xml|django|jinja)$'
+        args: [--reformat]
+      - id: djlint
+        name: djlint (check)
+        files: '^(api|web)/.*\.(html|txt|xml|django|jinja)$'
+        args: [--check]
+
+  # --- Optional: Python Security Linter (Bandit) ---
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.7.9
+  #   hooks:
+  #     - id: bandit
+  #       files: '^(api|other_api_service)/.*\.py$'
+  #       args:
+  #         - -r
+  #         - .
+  #         - -ll
+  #         - -c
+  #         - pyproject.toml
+
+  # --- [OPTIONAL] Frontend Code Quality Tools ---
+  # Uncomment and configure these hooks if/when frontend/ is added.
+
+  # - repo: https://github.com/pre-commit/mirrors-eslint
+  #   rev: v8.56.0
+  #   hooks:
+  #     - id: eslint
+  #       files: '^frontend/.*\.(js|jsx|ts|tsx)$'
+  #       additional_dependencies: ['eslint']
+
+  # - repo: https://github.com/prettier/prettier
+  #   rev: v3.2.5
+  #   hooks:
+  #     - id: prettier
+  #       files: '^frontend/.*\.(js|jsx|ts|tsx|css|scss|html)$'
